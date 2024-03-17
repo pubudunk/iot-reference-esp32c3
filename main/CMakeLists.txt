@@ -18,6 +18,7 @@ if(CONFIG_GRI_ENABLE_TEMPERATURE_PUB_SUB_AND_LED_CONTROL_DEMO)
     list(APPEND MAIN_SRCS
         "demo_tasks/temp_sub_pub_and_led_control_demo/temp_sub_pub_and_led_control_demo.c"
         "demo_tasks/temp_sub_pub_and_led_control_demo/hardware_drivers/app_driver.c"
+        "demo_tasks/temp_sub_pub_and_led_control_demo/hardware_drivers/dht11.c"
     )
 endif()
 

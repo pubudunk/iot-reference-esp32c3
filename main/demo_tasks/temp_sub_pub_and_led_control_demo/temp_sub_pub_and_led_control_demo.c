@@ -86,6 +86,9 @@
 /* Demo task configurations include. */
 #include "temp_sub_pub_and_led_control_demo_config.h"
 
+/* PK: To get the app version */
+#include "ota_over_mqtt_demo_config.h"
+
 /* Preprocessor definitions ***************************************************/
 
 /* coreMQTT-Agent event group bit definitions */
@@ -447,6 +450,10 @@ static bool prvSubscribeToTopic( MQTTQoS_t xQoS,
     return xCommandAcknowledged;
 }
 
+uint8_t ucButtonStatus = 0;
+
+static const uint8_t ucSensorID = 101;
+
 static void prvTempSubPubAndLEDControlTask( void * pvParameters )
 {
     MQTTPublishInfo_t xPublishInfo = { 0UL };
@@ -462,11 +469,14 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
     const char * pcTaskName;
     uint32_t ulPublishPassCounts = 0;
     uint32_t ulPublishFailCounts = 0;
+    uint8_t ucTempValue = 0, ucHumidityValue = 0;
 
     pcTaskName = pcTaskGetName( xTaskGetCurrentTaskHandle() );
+    //const char * pcTopicName = "temperature";
+
 
     /* Hardware initialisation */
-    app_driver_init();
+    app_driver_hw_init();
 
     /* Initialize the coreMQTT-Agent event group. */
     xNetworkEventGroup = xEventGroupCreate();
@@ -481,8 +491,7 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
     /* Create a topic name for this task to publish to. */
     snprintf( pcTopicBuffer,
               temppubsubandledcontrolconfigSTRING_BUFFER_LENGTH,
-              "/filter/%s",
-              pcTaskName );
+              "/smart_sensor/%d/data",ucSensorID);
 
     /* Subscribe to the same topic to which this task will publish.  That will
      * result in each published message being published from the server back to
@@ -514,21 +523,33 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
         /* Create a payload to send with the publish message.  This contains
          * the task name, temperature and the iteration number. */
 
-        temperatureValue = app_driver_temp_sensor_read_celsius();
+        // temperatureValue = app_driver_temp_sensor_read_celsius();
+        app_driver_temp_sensor_read_values();
+        ucTempValue = app_driver_temp_sensor_get_temperature();
+        ucHumidityValue = app_driver_temp_sensor_get_humidity();
 
         snprintf( payloadBuf,
                   temppubsubandledcontrolconfigSTRING_BUFFER_LENGTH,
-                  "{"                            \
-                  "\"temperatureSensor\":"       \
-                  "{"                            \
-                  " \"taskName\": \"%s\","       \
-                  " \"temperatureValue\": %f,"   \
-                  " \"iteration\": %" PRIu32 ""  \
-                                             "}" \
-                                             "}" \
+                "{"                                             \
+                    " \"sensorID\":%d, "                        \
+                    " \"tempSensor\":"                     \
+                    "{"    
+                        " \"temperatureValueF\":%d,"    \
+                        " \"humidityValue\":%d "       \
+                    "},"                                 \
+                    "\"lightSwitch\":"                        \
+                    "{"
+                        " \"switchStatus\":%d"            \
+                    "},"                                     \
+                    "\"firmwareVersion\":\"%d.%d.%d\","      \
+                    " \"iteration\":%"PRIu32""                \
+                "}"                                             \
                   ,
-                  pcTaskName,
-                  temperatureValue,
+                  ucSensorID,
+                  ucTempValue,
+                  ucHumidityValue,
+                  ucButtonStatus,
+                  APP_VERSION_MAJOR, APP_VERSION_MINOR, APP_VERSION_BUILD,
                   ulValueToNotify );
 
         xPublishInfo.payloadLength = ( uint16_t ) strlen( payloadBuf );
@@ -545,12 +566,12 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
                              pdFALSE,
                              pdTRUE,
                              portMAX_DELAY );
-
+#if 0
         ESP_LOGI( TAG,
                   "Sending publish request to agent with message \"%s\" on topic \"%s\"",
                   payloadBuf,
                   pcTopicBuffer );
-
+#endif
         /* To ensure ulNotification doesn't accidentally hold the expected value
          * as it is to be checked against the value sent from the callback.. */
         ulNotification = ~ulValueToNotify;
@@ -559,14 +580,14 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
                                            &xPublishInfo,
                                            &xCommandParams );
         configASSERT( xCommandAdded == MQTTSuccess );
-
+#if 0
         /* For QoS 1 and 2, wait for the publish acknowledgment.  For QoS0,
          * wait for the publish to be sent. */
         ESP_LOGI( TAG,
                   "Task %s waiting for publish %" PRIu32 " to complete.",
                   pcTaskName,
                   ulValueToNotify );
-
+#endif
         prvWaitForCommandAcknowledgment( &ulNotification );
 
         /* The value received by the callback that executed when the publish was
@@ -660,8 +681,9 @@ static void prvCoreMqttAgentEventHandler( void * pvHandlerArg,
 
 void vStartTempSubPubAndLEDControlDemo( void )
 {
+
     xTaskCreate( prvTempSubPubAndLEDControlTask,
-                 "TempSubPubLED",
+                 "ReadTempSensor",
                  temppubsubandledcontrolconfigTASK_STACK_SIZE,
                  NULL,
                  temppubsubandledcontrolconfigTASK_PRIORITY,
