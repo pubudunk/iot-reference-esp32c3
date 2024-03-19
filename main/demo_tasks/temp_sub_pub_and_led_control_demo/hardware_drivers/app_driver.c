@@ -87,9 +87,71 @@ esp_err_t app_driver_init()
     }
 }
 
+
+
+/* PK 3 color led */
+#define BLUE_LED_GPIO       27
+#define GREEN_LED_GPIO      25
+#define RED_LED_GPIO        26
+#define GPIO_INPUT_PIN_SEL  ( ( 0x01 << BLUE_LED_GPIO ) | (0x01 << GREEN_LED_GPIO) | (0x01 << RED_LED_GPIO) )
+
+enum led_color {
+    RED,
+    GREEN,
+    BLUE
+};
+
+static enum led_color LED_COLOR = RED;
+
+void app_driver_hw_led_on_red(void)
+{
+    gpio_set_level(RED_LED_GPIO, 1);
+}
+
+void app_driver_hw_led_on_green(void)
+{
+    gpio_set_level(GREEN_LED_GPIO, 1);
+}
+
+void app_driver_hw_led_on_blue(void)
+{
+    gpio_set_level(BLUE_LED_GPIO, 1);
+}
+
+void app_driver_hw_led_off(void)
+{
+    gpio_set_level(RED_LED_GPIO, 0);
+    gpio_set_level(GREEN_LED_GPIO, 0);
+    gpio_set_level(BLUE_LED_GPIO, 0);
+}
+
+esp_err_t app_driver_hw_init(void)
+{
+   gpio_config_t io_conf = {};
+
+    //  disable interrupt
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    //  set as output mode
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    //  bit mask of the pins
+    io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
+    //  disable pull-down mode
+    io_conf.pull_down_en = 0;
+    //  disable pull-up mode
+    io_conf.pull_up_en = 0;
+    //  configure GPIO with the given settings
+    gpio_config(&io_conf);
+
+    app_driver_hw_led_off();
+
+    return ESP_OK;
+}
+
 esp_err_t app_driver_led_on()
 {
-    esp_err_t ret = ESP_FAIL;
+    esp_err_t ret = ESP_OK;
+
+    app_driver_hw_led_on_red();
 
     #ifdef CONFIG_GRI_TEMPERATURE_PUB_SUB_AND_LED_CONTROL_DEMO_LED_RMT
         #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL( 5, 0, 0 )
@@ -108,7 +170,9 @@ esp_err_t app_driver_led_on()
 
 esp_err_t app_driver_led_off()
 {
-    esp_err_t ret = ESP_FAIL;
+    esp_err_t ret = ESP_OK;
+
+    app_driver_hw_led_off();
 
     #ifdef CONFIG_GRI_TEMPERATURE_PUB_SUB_AND_LED_CONTROL_DEMO_LED_RMT
         #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL( 5, 0, 0 )

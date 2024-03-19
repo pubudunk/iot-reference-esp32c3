@@ -310,8 +310,8 @@ static void prvParseIncomingPublish( char * publishPayload,
     {
         result = JSON_Search( ( char * ) publishPayload,
                               publishPayloadLength,
-                              "led.power",
-                              sizeof( "led.power" ) - 1,
+                              "power",
+                              sizeof( "power" ) - 1,
                               &outValue,
                               ( size_t * ) &outValueLength );
     }
@@ -328,10 +328,12 @@ static void prvParseIncomingPublish( char * publishPayload,
 
         if( state == 1 )
         {
+            ESP_LOGI( TAG, "light on" );
             app_driver_led_on();
         }
         else if( state == 0 )
         {
+            ESP_LOGI( TAG, "light off" );
             app_driver_led_off();
         }
     }
@@ -447,6 +449,9 @@ static bool prvSubscribeToTopic( MQTTQoS_t xQoS,
     return xCommandAcknowledged;
 }
 
+static const uint8_t ucLightID = 51;
+uint8_t ucLightStatus = 0;
+
 static void prvTempSubPubAndLEDControlTask( void * pvParameters )
 {
     MQTTPublishInfo_t xPublishInfo = { 0UL };
@@ -466,7 +471,8 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
     pcTaskName = pcTaskGetName( xTaskGetCurrentTaskHandle() );
 
     /* Hardware initialisation */
-    app_driver_init();
+    //app_driver_init();
+    app_driver_hw_init();
 
     /* Initialize the coreMQTT-Agent event group. */
     xNetworkEventGroup = xEventGroupCreate();
@@ -481,8 +487,7 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
     /* Create a topic name for this task to publish to. */
     snprintf( pcTopicBuffer,
               temppubsubandledcontrolconfigSTRING_BUFFER_LENGTH,
-              "/filter/%s",
-              pcTaskName );
+              "/smart_light/%d/data",ucLightID);
 
     /* Subscribe to the same topic to which this task will publish.  That will
      * result in each published message being published from the server back to
@@ -518,17 +523,14 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
 
         snprintf( payloadBuf,
                   temppubsubandledcontrolconfigSTRING_BUFFER_LENGTH,
-                  "{"                            \
-                  "\"temperatureSensor\":"       \
-                  "{"                            \
-                  " \"taskName\": \"%s\","       \
-                  " \"temperatureValue\": %f,"   \
-                  " \"iteration\": %" PRIu32 ""  \
-                                             "}" \
-                                             "}" \
+                "{"                                             \
+                    " \"lightID\":%d,"                        \
+                    " \"lightStatus\":%d,"                     \
+                    " \"iteration\":%"PRIu32""                \
+                "}"                                             \
                   ,
-                  pcTaskName,
-                  temperatureValue,
+                  ucLightID,
+                  ucLightStatus,
                   ulValueToNotify );
 
         xPublishInfo.payloadLength = ( uint16_t ) strlen( payloadBuf );
@@ -546,11 +548,12 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
                              pdTRUE,
                              portMAX_DELAY );
 
+#if 0                             
         ESP_LOGI( TAG,
                   "Sending publish request to agent with message \"%s\" on topic \"%s\"",
                   payloadBuf,
                   pcTopicBuffer );
-
+#endif
         /* To ensure ulNotification doesn't accidentally hold the expected value
          * as it is to be checked against the value sent from the callback.. */
         ulNotification = ~ulValueToNotify;
@@ -560,13 +563,14 @@ static void prvTempSubPubAndLEDControlTask( void * pvParameters )
                                            &xCommandParams );
         configASSERT( xCommandAdded == MQTTSuccess );
 
+#if 0
         /* For QoS 1 and 2, wait for the publish acknowledgment.  For QoS0,
          * wait for the publish to be sent. */
         ESP_LOGI( TAG,
                   "Task %s waiting for publish %" PRIu32 " to complete.",
                   pcTaskName,
                   ulValueToNotify );
-
+#endif
         prvWaitForCommandAcknowledgment( &ulNotification );
 
         /* The value received by the callback that executed when the publish was
@@ -661,7 +665,7 @@ static void prvCoreMqttAgentEventHandler( void * pvHandlerArg,
 void vStartTempSubPubAndLEDControlDemo( void )
 {
     xTaskCreate( prvTempSubPubAndLEDControlTask,
-                 "TempSubPubLED",
+                 "SmartLight",
                  temppubsubandledcontrolconfigTASK_STACK_SIZE,
                  NULL,
                  temppubsubandledcontrolconfigTASK_PRIORITY,

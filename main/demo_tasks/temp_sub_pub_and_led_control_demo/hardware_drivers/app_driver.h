@@ -25,6 +25,7 @@
 #include "led_strip.h"
 
 esp_err_t app_driver_init();
+esp_err_t app_driver_hw_init(void);
 
 float app_driver_temp_sensor_read_celsius();
 
